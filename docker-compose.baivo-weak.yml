@@ -88,6 +88,12 @@ services:
       ai.baivo.app: sim-app
     networks:
       - baivo-shared-net
+    # Inject every var rendered into .env.sim by vault-sync-app.sh, so optional
+    # integration secrets (OPENAI_API_KEY, RESEND_API_KEY, ...) added to Vault
+    # flow through without editing this file. The `environment:` keys below still
+    # take precedence over env_file for the static values they set.
+    env_file:
+      - /home/baivo/secrets/.env.sim
     environment:
       # --- Static (hardcoded) ---
       - NODE_ENV=production
