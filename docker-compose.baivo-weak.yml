@@ -1,0 +1,128 @@
+# Sim — deployment on the baivo-weak host.
+#
+# Fits the baivo-infra model:
+#   - joins the external shared network `baivo-shared-net`
+#   - uses the shared Postgres (hostname `baivo`); NO db service here
+#   - publishes ONLY to 127.0.0.1 (loopback); the LAN reaches it through Caddy
+#     at https://sim.baivo-weak (and https://baivo-weak:8094 as a port fallback)
+#   - carries `ai.baivo.app` labels so Promtail discovers the logs
+#   - all secrets come from Vault, rendered into an env file and passed via
+#     `--env-file`. Secrets use ${VAR} with no default → compose fails fast if a
+#     secret is missing. Non-secret config is hardcoded below.
+#
+# Prereqs:
+#   1. Provision the app's Postgres role + DB (writes DATABASE_URL to Vault):
+#        cd /home/baivo/baivo-infra && ./scripts/pg-provision-app.sh sim
+#   2. Store the app secrets in Vault (e.g. secret/baivo/sim):
+#        BETTER_AUTH_SECRET, ENCRYPTION_KEY, API_ENCRYPTION_KEY, INTERNAL_API_SECRET
+#        (generate each with `openssl rand -hex 32`)
+#   3. Render them into an env file from Vault, then:
+#        docker compose --env-file /home/baivo/secrets/.env.sim \
+#          -f docker-compose.baivo-weak.yml up -d
+#
+# DATABASE_URL resolves to the shared instance, e.g.
+#   postgresql://sim_app:<pw>@baivo:5432/sim
+
+services:
+  sim-migrations:
+    image: ghcr.io/simstudioai/migrations:latest
+    working_dir: /app/packages/db
+    labels:
+      ai.baivo.app: sim-migrations
+    networks:
+      - baivo-shared-net
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+    command: ['bun', 'run', 'db:migrate']
+    restart: 'no'
+
+  sim-realtime:
+    image: ghcr.io/simstudioai/realtime:latest
+    restart: unless-stopped
+    # Loopback only — the LAN reaches realtime via Caddy under /socket.io on the
+    # sim site. Do NOT publish on 0.0.0.0.
+    ports:
+      - '127.0.0.1:3011:3002'
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    labels:
+      ai.baivo.app: sim-realtime
+    networks:
+      - baivo-shared-net
+    environment:
+      # --- Static (hardcoded) ---
+      - NODE_ENV=production
+      - BETTER_AUTH_URL=https://sim.baivo-weak
+      - NEXT_PUBLIC_APP_URL=https://sim.baivo-weak
+      - ALLOWED_ORIGINS=https://baivo-weak:8094,https://192.168.178.172:8094
+      # --- From Vault ---
+      - DATABASE_URL=${DATABASE_URL}
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
+      - INTERNAL_API_SECRET=${INTERNAL_API_SECRET}
+      # REDIS_URL omitted: single-replica → in-memory rooms. For multi-pod set
+      # it to the shared instance: REDIS_URL=redis://redis:6379 (must be a valid
+      # URL — never pass an empty string, the env schema rejects it).
+    depends_on:
+      sim-migrations:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', 'http://127.0.0.1:3002/health']
+      interval: 90s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  sim-app:
+    image: ghcr.io/simstudioai/simstudio:latest
+    restart: unless-stopped
+    # Loopback only — the LAN reaches the app via Caddy (https://sim.baivo-weak).
+    ports:
+      - '127.0.0.1:3010:3000'
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+    labels:
+      ai.baivo.app: sim-app
+    networks:
+      - baivo-shared-net
+    environment:
+      # --- Static (hardcoded) ---
+      - NODE_ENV=production
+      - BETTER_AUTH_URL=https://sim.baivo-weak
+      - NEXT_PUBLIC_APP_URL=https://sim.baivo-weak
+      - TRUSTED_ORIGINS=https://baivo-weak:8094,https://192.168.178.172:8094
+      # sim → realtime server-side calls, over the shared network by hostname
+      - SOCKET_SERVER_URL=http://sim-realtime:3002
+      # Browser Socket.IO defaults to the page origin; Caddy routes /socket.io
+      # on the sim site to sim-realtime, so this stays empty.
+      - NEXT_PUBLIC_SOCKET_URL=
+      - ADMISSION_GATE_MAX_INFLIGHT=500
+      # --- From Vault ---
+      - DATABASE_URL=${DATABASE_URL}
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - API_ENCRYPTION_KEY=${API_ENCRYPTION_KEY}
+      - INTERNAL_API_SECRET=${INTERNAL_API_SECRET}
+      # REDIS_URL omitted: single-replica → in-memory rooms. For multi-pod set
+      # it to the shared instance: REDIS_URL=redis://redis:6379 (must be a valid
+      # URL — never pass an empty string, the env schema rejects it).
+      - COPILOT_API_KEY=${COPILOT_API_KEY:-}
+      - SIM_AGENT_API_URL=${SIM_AGENT_API_URL:-}
+    depends_on:
+      sim-migrations:
+        condition: service_completed_successfully
+      sim-realtime:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', 'http://127.0.0.1:3000']
+      interval: 90s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+networks:
+  baivo-shared-net:
+    external: true
