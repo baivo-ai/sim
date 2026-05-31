@@ -4,7 +4,7 @@ import { getErrorMessage } from '@sim/utils/errors'
 import { generateId } from '@sim/utils/id'
 import { and, eq, sql } from 'drizzle-orm'
 import { resolveOrCreateChat } from '@/lib/copilot/chat/lifecycle'
-import { appendCopilotChatMessages } from '@/lib/copilot/chat/messages-dual-write'
+import { appendCopilotChatMessages } from '@/lib/copilot/chat/messages-store'
 import { buildIntegrationToolSchemas } from '@/lib/copilot/chat/payload'
 import {
   buildPersistedAssistantMessage,
@@ -343,13 +343,9 @@ async function persistChatMessages(
 
     const assistantMessage = buildPersistedAssistantMessage(result)
 
-    const newMessages = JSON.stringify([userMessage, assistantMessage])
     const [updated] = await db
       .update(copilotChats)
-      .set({
-        messages: sql`COALESCE(${copilotChats.messages}, '[]'::jsonb) || ${newMessages}::jsonb`,
-        updatedAt: new Date(),
-      })
+      .set({ updatedAt: new Date() })
       .where(eq(copilotChats.id, chatId))
       .returning({ model: copilotChats.model })
     if (updated) {
@@ -358,7 +354,7 @@ async function persistChatMessages(
       })
     }
   } catch (err) {
-    logger.warn('Failed to persist chat messages', {
+    logger.error('Failed to persist chat messages', {
       chatId,
       error: getErrorMessage(err, 'Unknown error'),
     })
