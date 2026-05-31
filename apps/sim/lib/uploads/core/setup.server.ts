@@ -69,15 +69,17 @@ if (typeof process !== 'undefined') {
       }
     }
   } else if (USE_S3_STORAGE) {
-    // Verify AWS credentials
-    if (!env.S3_BUCKET_NAME || !env.AWS_REGION) {
+    // Verify S3 credentials
+    if (!env.S3_BUCKET_NAME || !env.S3_REGION) {
       logger.warn('S3 storage configuration is incomplete')
-      logger.warn('Set S3_BUCKET_NAME and AWS_REGION for S3 storage')
-    } else if (!env.AWS_ACCESS_KEY_ID || !env.AWS_SECRET_ACCESS_KEY) {
-      logger.warn('AWS credentials are not set in environment variables')
-      logger.warn('Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY for S3 storage')
+      logger.warn('Set S3_BUCKET_NAME and S3_REGION for S3 storage')
+    } else if (!env.S3_ACCESS_KEY_ID || !env.S3_SECRET_ACCESS_KEY) {
+      logger.warn('S3 credentials are not set in environment variables')
+      logger.warn(
+        'Set S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY for S3 storage (or rely on IAM roles)'
+      )
     } else {
-      logger.info('AWS S3 credentials found in environment variables')
+      logger.info('S3 credentials found in environment variables')
     }
   } else {
     // Local storage mode

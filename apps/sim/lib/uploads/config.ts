@@ -5,7 +5,7 @@ export type { StorageConfig, StorageContext } from '@/lib/uploads/shared/types'
 
 export const UPLOAD_DIR = '/uploads'
 
-const hasS3Config = !!(env.S3_BUCKET_NAME && env.AWS_REGION)
+const hasS3Config = !!(env.S3_BUCKET_NAME && env.S3_REGION)
 export const hasBlobConfig = !!(
   env.AZURE_STORAGE_CONTAINER_NAME &&
   ((env.AZURE_ACCOUNT_NAME && env.AZURE_ACCOUNT_KEY) || env.AZURE_CONNECTION_STRING)
@@ -16,7 +16,7 @@ export const USE_S3_STORAGE = hasS3Config && !USE_BLOB_STORAGE
 
 export const S3_CONFIG = {
   bucket: env.S3_BUCKET_NAME || '',
-  region: env.AWS_REGION || '',
+  region: env.S3_REGION || '',
 }
 
 export const BLOB_CONFIG = {
@@ -28,12 +28,12 @@ export const BLOB_CONFIG = {
 
 export const S3_KB_CONFIG = {
   bucket: env.S3_KB_BUCKET_NAME || '',
-  region: env.AWS_REGION || '',
+  region: env.S3_REGION || '',
 }
 
 export const S3_EXECUTION_FILES_CONFIG = {
   bucket: env.S3_EXECUTION_FILES_BUCKET_NAME || 'sim-execution-files',
-  region: env.AWS_REGION || '',
+  region: env.S3_REGION || '',
 }
 
 export const BLOB_KB_CONFIG = {
@@ -52,7 +52,7 @@ export const BLOB_EXECUTION_FILES_CONFIG = {
 
 export const S3_CHAT_CONFIG = {
   bucket: env.S3_CHAT_BUCKET_NAME || '',
-  region: env.AWS_REGION || '',
+  region: env.S3_REGION || '',
 }
 
 export const BLOB_CHAT_CONFIG = {
@@ -64,7 +64,7 @@ export const BLOB_CHAT_CONFIG = {
 
 export const S3_COPILOT_CONFIG = {
   bucket: env.S3_COPILOT_BUCKET_NAME || '',
-  region: env.AWS_REGION || '',
+  region: env.S3_REGION || '',
 }
 
 export const BLOB_COPILOT_CONFIG = {
@@ -76,7 +76,7 @@ export const BLOB_COPILOT_CONFIG = {
 
 export const S3_PROFILE_PICTURES_CONFIG = {
   bucket: env.S3_PROFILE_PICTURES_BUCKET_NAME || '',
-  region: env.AWS_REGION || '',
+  region: env.S3_REGION || '',
 }
 
 export const BLOB_PROFILE_PICTURES_CONFIG = {
@@ -88,7 +88,7 @@ export const BLOB_PROFILE_PICTURES_CONFIG = {
 
 export const S3_OG_IMAGES_CONFIG = {
   bucket: env.S3_OG_IMAGES_BUCKET_NAME || '',
-  region: env.AWS_REGION || '',
+  region: env.S3_REGION || '',
 }
 
 export const BLOB_OG_IMAGES_CONFIG = {
@@ -100,7 +100,7 @@ export const BLOB_OG_IMAGES_CONFIG = {
 
 export const S3_WORKSPACE_LOGOS_CONFIG = {
   bucket: env.S3_WORKSPACE_LOGOS_BUCKET_NAME || '',
-  region: env.AWS_REGION || '',
+  region: env.S3_REGION || '',
 }
 
 export const BLOB_WORKSPACE_LOGOS_CONFIG = {
@@ -148,18 +148,18 @@ function getS3Config(context: StorageContext): StorageConfig {
   switch (context) {
     case 'knowledge-base':
       return {
-        bucket: S3_KB_CONFIG.bucket,
-        region: S3_KB_CONFIG.region,
+        bucket: S3_KB_CONFIG.bucket || S3_CONFIG.bucket,
+        region: S3_KB_CONFIG.region || S3_CONFIG.region,
       }
     case 'chat':
       return {
-        bucket: S3_CHAT_CONFIG.bucket,
-        region: S3_CHAT_CONFIG.region,
+        bucket: S3_CHAT_CONFIG.bucket || S3_CONFIG.bucket,
+        region: S3_CHAT_CONFIG.region || S3_CONFIG.region,
       }
     case 'copilot':
       return {
-        bucket: S3_COPILOT_CONFIG.bucket,
-        region: S3_COPILOT_CONFIG.region,
+        bucket: S3_COPILOT_CONFIG.bucket || S3_CONFIG.bucket,
+        region: S3_COPILOT_CONFIG.region || S3_CONFIG.region,
       }
     case 'execution':
       return {

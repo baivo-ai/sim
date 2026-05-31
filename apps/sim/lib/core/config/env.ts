@@ -203,10 +203,12 @@ export const env = createEnv({
     SCHEDULE_INFRA_RETRY_MAX_MS:           z.string().optional().default('300000'),
     SCHEDULE_INFRA_RETRY_MAX_ATTEMPTS:     z.string().optional().default('10'),
 
-    // Cloud Storage - AWS S3
-    AWS_REGION:                            z.string().optional(),                  // AWS region for S3 buckets
-    AWS_ACCESS_KEY_ID:                     z.string().optional(),                  // AWS access key ID
-    AWS_SECRET_ACCESS_KEY:                 z.string().optional(),                  // AWS secret access key
+    // Cloud Storage - S3 (AWS S3 or any S3-compatible service, e.g. MinIO)
+    S3_REGION:                             z.string().optional(),                  // S3 region for buckets (e.g. "us-east-1"; any non-empty value for MinIO)
+    S3_ACCESS_KEY_ID:                      z.string().optional(),                  // S3 access key ID (optional when using IAM roles / instance profiles)
+    S3_SECRET_ACCESS_KEY:                  z.string().optional(),                  // S3 secret access key (optional when using IAM roles / instance profiles)
+    S3_ENDPOINT:                           z.string().url().optional(),            // Custom S3-compatible endpoint (e.g. MinIO: http://minio:9000). Leave unset for AWS S3.
+    S3_FORCE_PATH_STYLE:                   z.boolean().optional(),                 // Force path-style addressing (bucket in path, not host). Defaults to true when S3_ENDPOINT is set (MinIO requires it).
     S3_BUCKET_NAME:                        z.string().optional(),                  // S3 bucket for general file storage
     S3_LOGS_BUCKET_NAME:                   z.string().optional(),                  // S3 bucket for storing logs
     S3_KB_BUCKET_NAME:                     z.string().optional(),                  // S3 bucket for knowledge base files

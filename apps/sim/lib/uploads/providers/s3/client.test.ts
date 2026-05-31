@@ -20,9 +20,9 @@ const {
   const mockEnv: Record<string, string | undefined> = {
     NEXT_PUBLIC_APP_URL: 'https://test.sim.ai',
     S3_BUCKET_NAME: 'test-bucket',
-    AWS_REGION: 'test-region',
-    AWS_ACCESS_KEY_ID: 'test-access-key',
-    AWS_SECRET_ACCESS_KEY: 'test-secret-key',
+    S3_REGION: 'test-region',
+    S3_ACCESS_KEY_ID: 'test-access-key',
+    S3_SECRET_ACCESS_KEY: 'test-secret-key',
   }
   return {
     mockSend,
@@ -88,8 +88,10 @@ describe('S3 Client', () => {
     vi.clearAllMocks()
     vi.spyOn(Date, 'now').mockReturnValue(1672603200000)
     vi.spyOn(Date.prototype, 'toISOString').mockReturnValue('2025-06-16T01:13:10.765Z')
-    mockEnv.AWS_ACCESS_KEY_ID = 'test-access-key'
-    mockEnv.AWS_SECRET_ACCESS_KEY = 'test-secret-key'
+    mockEnv.S3_ACCESS_KEY_ID = 'test-access-key'
+    mockEnv.S3_SECRET_ACCESS_KEY = 'test-secret-key'
+    mockEnv.S3_ENDPOINT = undefined
+    mockEnv.S3_FORCE_PATH_STYLE = undefined
     resetS3ClientForTesting()
   })
 
@@ -326,8 +328,8 @@ describe('S3 Client', () => {
 
   describe('s3Client initialization', () => {
     it('should initialize with correct configuration when credentials are available', () => {
-      mockEnv.AWS_ACCESS_KEY_ID = 'test-access-key'
-      mockEnv.AWS_SECRET_ACCESS_KEY = 'test-secret-key'
+      mockEnv.S3_ACCESS_KEY_ID = 'test-access-key'
+      mockEnv.S3_SECRET_ACCESS_KEY = 'test-secret-key'
       resetS3ClientForTesting()
 
       const client = getS3Client()
@@ -335,6 +337,8 @@ describe('S3 Client', () => {
       expect(client).toBeDefined()
       expect(mockS3ClientConstructor).toHaveBeenCalledWith({
         region: 'test-region',
+        endpoint: undefined,
+        forcePathStyle: false,
         credentials: {
           accessKeyId: 'test-access-key',
           secretAccessKey: 'test-secret-key',
@@ -343,8 +347,8 @@ describe('S3 Client', () => {
     })
 
     it('should initialize without credentials when env vars are not available', () => {
-      mockEnv.AWS_ACCESS_KEY_ID = undefined
-      mockEnv.AWS_SECRET_ACCESS_KEY = undefined
+      mockEnv.S3_ACCESS_KEY_ID = undefined
+      mockEnv.S3_SECRET_ACCESS_KEY = undefined
       resetS3ClientForTesting()
 
       const client = getS3Client()
@@ -352,7 +356,46 @@ describe('S3 Client', () => {
       expect(client).toBeDefined()
       expect(mockS3ClientConstructor).toHaveBeenCalledWith({
         region: 'test-region',
+        endpoint: undefined,
+        forcePathStyle: false,
         credentials: undefined,
+      })
+    })
+
+    it('should target a custom S3-compatible endpoint with path-style addressing (MinIO)', () => {
+      mockEnv.S3_ENDPOINT = 'http://minio:9000'
+      resetS3ClientForTesting()
+
+      const client = getS3Client()
+
+      expect(client).toBeDefined()
+      expect(mockS3ClientConstructor).toHaveBeenCalledWith({
+        region: 'test-region',
+        endpoint: 'http://minio:9000',
+        forcePathStyle: true,
+        credentials: {
+          accessKeyId: 'test-access-key',
+          secretAccessKey: 'test-secret-key',
+        },
+      })
+    })
+
+    it('should honor an explicit S3_FORCE_PATH_STYLE override over the endpoint default', () => {
+      mockEnv.S3_ENDPOINT = 'https://s3.example.com'
+      mockEnv.S3_FORCE_PATH_STYLE = 'false'
+      resetS3ClientForTesting()
+
+      const client = getS3Client()
+
+      expect(client).toBeDefined()
+      expect(mockS3ClientConstructor).toHaveBeenCalledWith({
+        region: 'test-region',
+        endpoint: 'https://s3.example.com',
+        forcePathStyle: false,
+        credentials: {
+          accessKeyId: 'test-access-key',
+          secretAccessKey: 'test-secret-key',
+        },
       })
     })
   })

@@ -13,7 +13,7 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { getErrorMessage } from '@sim/utils/errors'
 import { generateId } from '@sim/utils/id'
-import { env } from '@/lib/core/config/env'
+import { env, isTruthy } from '@/lib/core/config/env'
 import {
   assertKnownSizeWithinLimit,
   readNodeStreamToBufferWithLimit,
@@ -48,17 +48,27 @@ export function getS3Client(): S3Client {
 
   if (!region) {
     throw new Error(
-      'AWS region is missing – set AWS_REGION in your environment or disable S3 uploads.'
+      'S3 region is missing – set S3_REGION in your environment or disable S3 uploads.'
     )
   }
 
+  // Custom endpoint targets an S3-compatible service such as MinIO. Such
+  // services require path-style addressing (bucket in the path, not the host),
+  // so default forcePathStyle to true whenever an endpoint is set unless the
+  // operator overrides it explicitly via S3_FORCE_PATH_STYLE.
+  const endpoint = env.S3_ENDPOINT || undefined
+  const forcePathStyle =
+    env.S3_FORCE_PATH_STYLE !== undefined ? isTruthy(env.S3_FORCE_PATH_STYLE) : Boolean(endpoint)
+
   _s3Client = new S3Client({
     region,
+    endpoint,
+    forcePathStyle,
     credentials:
-      env.AWS_ACCESS_KEY_ID && env.AWS_SECRET_ACCESS_KEY
+      env.S3_ACCESS_KEY_ID && env.S3_SECRET_ACCESS_KEY
         ? {
-            accessKeyId: env.AWS_ACCESS_KEY_ID,
-            secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
+            accessKeyId: env.S3_ACCESS_KEY_ID,
+            secretAccessKey: env.S3_SECRET_ACCESS_KEY,
           }
         : undefined,
   })
@@ -409,7 +419,10 @@ export async function completeS3MultipartUpload(
 
   const response = await s3Client.send(command)
   const location =
-    response.Location || `https://${config.bucket}.s3.${config.region}.amazonaws.com/${key}`
+    response.Location ||
+    (env.S3_ENDPOINT
+      ? `${env.S3_ENDPOINT.replace(/\/$/, '')}/${config.bucket}/${key}`
+      : `https://${config.bucket}.s3.${config.region}.amazonaws.com/${key}`)
   const path = `/api/files/serve/${encodeURIComponent(key)}`
 
   return {
